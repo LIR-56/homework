@@ -3,46 +3,84 @@
 .code
 org 100h
 start:
-	mov ah,03dh
+
+	jmp Init
+	
+file_error:																					;что-то навроде обработки ошибок(если проблемы с файлами, пишем что проблемы с файлами)
+	mov ah, 59h
+	xor bx, bx
+	int 21h
+	push ax
+	push bx
+	push dx
+	mov ax, cs
+	mov ds, ax
+	mov es, ax
+	mov bp, sp
+	mov ah, 9
+	mov dx, offset string
+	int 21h
+	mov dx, word ptr cs:[bp+6]
+	int 21h
+	
+	
+
+	add sp, 8
+	ret
+Init:																						
+	
+	mov ah,03dh								;открываем файл Image
 	mov al, 00000010b
 	mov dx, offset filename2
+	push dx
 	int 21h
-	mov bx, ax
+	jc file_error
+	
+	mov bx, ax									;считываем его	
 	mov ah, 3fh
 	mov cx, 1000
 	mov dx, offset buf
 	int 21h
-	mov ah, 3Eh
-	int 21h
-
-	mov ah,03dh
+	jc file_error
+	
+	mov ah, 3Eh								;закрываем файл
+	int 21h											
+	jc file_error
+	add sp, 2
+	
+	mov ah,03dh								;открываем файл Config.qwe																					
 	mov al, 00000010b
 	mov dx, offset filename1
+	push dx
 	int 21h
-	mov bx, ax
+	jc file_error
+	
+	mov bx, ax									;считываем его			
 	mov ah, 3fh
 	mov cx, 40
 	mov dx, offset config 
 	int 21h
-	mov ah, 3Eh
+	jc file_error
+	
+	mov ah, 3Eh								;закрываем файл
 	int 21h
-	
-	
+	jc file_error
+	add sp, 2				
 
-cycle:	
+cycle:												;большой цикл по которому собственно и бегает весь алгоритм
 	mov bx, offset config
-	cmp byte ptr ds:[bx], 0aah
-	jne go1
+	cmp byte ptr ds:[bx], 0aah			;сравниваем значение первого провода с 0aah, если не равен то провод считается сломаннымм и мы ставим имеющееся значение, если же равен, то пишем в ah содержимое UkKom	
+	jne go1											
 	xor ax, ax
-	mov ah, UkKom
+	mov ah, UkKom											
 	jmp go1_0
 go1:
 	mov ah, byte ptr ds:[bx]
 go1_0:
 	
-	mov ukkom2, ah
+	mov ukkom2, ah							;сохраняем в память текущее состояние регистра Укком
 	inc bx
-	cmp byte ptr ds:[bx], 0aah
+	cmp byte ptr ds:[bx], 0aah			;сравниваем значение второго провода с 0aah, если не равен то провод считается сломаннымм и мы ставим имеющееся значение, если же равен, то пишем в al содержимое ah(то есть при работающем механизме содержимое УкКом)	
 	jne go2
 	mov al, ah
 	jmp go2_0
@@ -50,8 +88,9 @@ go2:
 	mov al, byte ptr ds:[bx]
 go2_0:	
 	
+	
 	inc bx
-	cmp byte ptr ds:[bx], 0aah
+	cmp byte ptr ds:[bx], 0aah			;анализируем третий провод по той же схеме, что и первые 2 (собственно всего я насчитал 38 проводов и они все анализируются примерно таким образом, при этом запоминаются значение либо в регистры, либо в стэк, либо в память)
 	jne go3
 	push bx
 	xor bx, bx
@@ -142,7 +181,7 @@ go9:
 go9_0:
 	
 	
-	pusha
+	pusha																						;далее идущие переходы сначала выставляют значения И, П, ОП и ПЕРЕХ в зависимости от команды и переходит к deccom_beg
 	cmp ch, 00h
 	jne c1
 	mov ah, 0
@@ -285,7 +324,7 @@ c12:
 	mov perech,0
 	
 	
-deccom_beg:	
+deccom_beg:						;эмуляция работы деккома, выставляем флаги запп, зам2, выб, пуск, зам1, взап1, чист
 	mov sapp, 0
 	cmp bh, 0
 	jne _1
@@ -326,7 +365,7 @@ _7:
 	popa
 	
 	
-	inc bx
+	inc bx																;продолжаем бегать по провадам, проверять их корректность и изменять(или не изменять) значения в зависимости от результата
 	cmp byte ptr ds:[bx], 0aah
 	jne go10
 	jmp go10_0
@@ -419,9 +458,9 @@ go17_0:
 go18:
 	mov ch, byte ptr ds:[bx]
 go18_0:	
-
-	cmp ch, 1
-	jb vib_m1 
+	
+	cmp ch, 1																		;тут эмулируется работа блока выб(чуть левее АЛУ)
+	jb vib_m1 	
 	ja vib_m2
 	mov ch, cl
 	jmp vib_m3
@@ -457,7 +496,7 @@ go21:
 	mov al, byte ptr ds:[bx]
 go21_0:	
 	
-	cmp al, 0
+	cmp al, 0																	;собственно, эмуляциа АЛУ
 	jne c_alu_0
 	mov al, cl
 	mov ah, 0
@@ -511,7 +550,7 @@ go23:
 	mov dl, byte ptr ds:[bx]
 go23_0:
 
-	cmp dl, 0
+	cmp dl, 0																	;если пуск=1, то пишем новое значение в УкКом
 	je jajmp
 	
 	mov UkKom, dh
@@ -544,9 +583,9 @@ go25_0:
 go26:
 	mov ch, byte ptr ds:[bx]
 go26_0:
-		
-	cmp ch, 1	
-	jne no_vsap1
+			
+	cmp ch, 1																		;пищем в РВВ, если взап1 =1				
+	jne no_vsap1	
  	mov RVV, cl
 	mov RVVfl, 1
 no_vsap1:		
@@ -594,7 +633,7 @@ go30:
 	mov dh, byte ptr ds:[bx]
 go30_0:
 
-	cmp dh, 1
+	cmp dh, 1																	;пишем в Индекс Регистр(ИР), если зам=1
 	jne no_sam2
 	mov IR, dl
 no_sam2:	
@@ -633,12 +672,12 @@ go33_0:
 	cmp dl, 1
 	jne no_sapp
 	push bx
-	xor bx, bx 
+	xor bx, bx 																				;пишем в память, если запп=1
 	mov bl, ch
 	add bx, offset buf
 	mov byte ptr ds:[bx], cl
 	pop bx
-no_sapp:	
+no_sapp:						
 	
 	inc bx
 	cmp byte ptr ds:[bx], 0aah
@@ -660,7 +699,7 @@ go35:
 	mov cl, byte ptr ds:[bx]
 go35_0:
 	
-	cmp cl, 1
+	cmp cl, 1																		;пишем в РВВ, если взап2=1
 	jne no_vsap2
 	mov RVV, ch
 	mov RVVfl, 0
@@ -685,14 +724,14 @@ go37:
 	jmp go38_0
 go38:
 	mov ch, byte ptr ds:[bx]
-go38_0:
+go38_0:																		;пишем в РОН, если зам1=1
 	cmp ch, 1
 	jne no_sam1
 	mov RON, al
 	mov RONpr, ah
 no_sam1:	
 	xor ax, ax
-	mov al, ukkom2
+	mov al, ukkom2													;сравниваем уккомы, если равны, то проверяем значение по этому адресу, если там FF, то записываем память в выходной файл в заканчиваем программу 
 	cmp al, UkKom
 	je end_or_not
 	jmp cycle
@@ -707,19 +746,26 @@ in_conc:
 	mov ah, 03ch
 	mov cx, 00
 	mov dx, offset filename3
+	push dx
 	int 21h
+	jc smth_str
 	mov bx, ax 
 	mov ah, 40h
 	mov cx, 0ffh
 	mov dx, offset buf 
 	int 21h
+	jc smth_str
 	mov ah, 3Eh
 	int 21h
-	
+	jc smth_str
+	add sp, 2
 	ret
-filename1 db 'Config.qwe', 0
-filename2 db 'Image', 0 
-filename3 db 'Im_res.txt', 0
+smth_str:
+	jmp file_error	
+filename1 db 'Config.qwe', 0,'$'
+filename2 db 'Image', 0 ,'$'
+filename3 db 'Im_res.txt', 0,'$'
+string db "Error while working with file: $"
 buf db 0ffh dup(0ffh)
 config db 40 dup(0aah)
 UkKom db 0

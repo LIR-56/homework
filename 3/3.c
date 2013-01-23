@@ -19,7 +19,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab ){
 	if(jas!=EFI_BUFFER_TOO_SMALL){Print(L"Error in getting memory map, str19\n");return EFI_SUCCESS;}
 
 	
-	//выделем память	
+	//выделяем память	
 	jas=uefi_call_wrapper(efi_bs->AllocatePool,3, my_pooltype,my_memmapsize, ((void*)&my_memmap));  
 	if(jas!=EFI_SUCCESS){Print(L"Error in allocating memory, str24\n");return EFI_SUCCESS;}
 
